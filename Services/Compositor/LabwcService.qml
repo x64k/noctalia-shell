@@ -10,7 +10,7 @@ Item {
   property ListModel workspaces: ListModel {}
   property var windows: []
   property int focusedWindowIndex: -1
-  property var trackedToplevels: ({})
+  property var trackedToplevels: new Set()
 
   // LabWC typically has global workspaces (shared across all outputs)
   property bool globalWorkspaces: true
@@ -184,7 +184,7 @@ Item {
   }
 
   function connectToToplevel(toplevel) {
-    if (!toplevel || !toplevel.address)
+    if (!toplevel)
       return;
 
     toplevel.activatedChanged.connect(() => {
@@ -204,7 +204,7 @@ Item {
   function updateWindows() {
     const newWindows = [];
     const toplevels = ToplevelManager.toplevels?.values || [];
-    const newTracked = {};
+    const newTracked = new Set();
 
     let focusedIdx = -1;
     let idx = 0;
@@ -213,13 +213,12 @@ Item {
       if (!toplevel)
         continue;
 
-      const addr = toplevel.address || "";
-      if (addr && !trackedToplevels[addr]) {
+      if (!trackedToplevels.has(toplevel)) {
         connectToToplevel(toplevel);
       }
-      if (addr) {
-        newTracked[addr] = true;
-      }
+      newTracked.add(toplevel);
+
+      const addr = toplevel.address || ("__toplevel_" + idx);
 
       newWindows.push({
                         "id": addr,
@@ -227,6 +226,7 @@ Item {
                         "title": toplevel.title || "",
                         "workspaceId": activeWorkspaceOid > 0 ? activeWorkspaceOid : 1,
                         "isFocused": toplevel.activated || false,
+			"output": (toplevel.screens && toplevel.screens.length > 0) ? toplevel.screens[0].name : "",
                         "toplevel": toplevel
                       });
 

@@ -353,18 +353,23 @@ Item {
         return ws.id;
       });
 
+      // Get ToplevelManager values for direct activated binding (labwc)
+      const toplevels = CompositorService.isLabwc
+        ? (ToplevelManager.toplevels?.values || []) : [];
+
       for (var i = 0; i < total; i++) {
         var w = CompositorService.windows.get(i);
         if (!w)
           continue;
         var passOutput = (!onlySameOutput) || (w.output == screen?.name);
-        var passWorkspace = (!onlyActiveWorkspaces) || (activeIds.includes(w.workspaceId));
+	var passWorkspace = (!onlyActiveWorkspaces) || CompositorService.globalWorkspaces || (activeIds.includes(w.workspaceId));
         if (passOutput && passWorkspace) {
           const isPinned = isAppIdPinned(w.appId, pinnedApps);
           runningWindows.push({
                                 "id": w.id,
                                 "type": isPinned ? "pinned-running" : "running",
                                 "window": w,
+                                "toplevel": (i < toplevels.length) ? toplevels[i] : null,
                                 "appId": w.appId,
                                 "title": w.title || getAppNameFromDesktopEntry(w.appId)
                               });
@@ -590,7 +595,7 @@ Item {
         // Find the focused window or first running window
         var currentIndex = -1;
         for (var i = 0; i < root.combinedModel.length; i++) {
-          if (root.combinedModel[i].window && root.combinedModel[i].window.isFocused) {
+          if (root.combinedModel[i].window && (root.combinedModel[i].toplevel ? root.combinedModel[i].toplevel.activated : root.combinedModel[i].window.isFocused)) {
             currentIndex = i;
             break;
           }
@@ -689,7 +694,12 @@ Item {
 
           readonly property bool isRunning: modelData.window !== null
           readonly property bool isPinned: modelData.type === "pinned" || modelData.type === "pinned-running"
-          readonly property bool isFocused: isRunning && modelData.window && modelData.window.isFocused
+          readonly property bool isFocused: {
+            if (!isRunning || !modelData.window) return false;
+            // Prefer live toplevel.activated binding (bypasses ListModel snapshot chain)
+            if (modelData.toplevel) return modelData.toplevel.activated === true;
+            return modelData.window.isFocused || false;
+          }
           readonly property bool isPinnedRunning: isPinned && isRunning && !isFocused
           readonly property bool isHovered: root.hoveredWindowId === modelData.id
 
